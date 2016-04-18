@@ -18,14 +18,18 @@ func main() {
 			Name:    "status",
 			Aliases: []string{"s"},
 			Usage:   "Report status Of Disks",
-			Action: Status,
+			Action:  Status,
 		},
 		{
-			Name:    "complete",
-			Aliases: []string{"c"},
-			Usage:   "complete a task on the list",
-			Action: func(c *cli.Context) {
-				println("completed task: ", c.Args().First())
+			Name:    "rename",
+			Aliases: []string{"r"},
+			Usage:   "Rename Vdisks conforming to cloudwatt spec",
+			Action:  RenameVdisks,
+			Flags: []cli.Flag{
+				cli.BoolTFlag{
+					Name:  "dry, d",
+					Usage: "Add --dry=false",
+				},
 			},
 		},
 		{

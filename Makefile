@@ -19,4 +19,7 @@ dockerimage: build-indocker
 	docker push ${rundockerimage}
 
 deploy: build
-	scp ${project} p-osncls-0005.adm.prd2.rue.cloudwatt.net:~/
+	scp ${project} s-osncls-0003.adm.stg0.aub.cloudwatt.net:~/
+	scp ${project} s-osncls-0004.adm.stg0.aub.cloudwatt.net:~/
+	scp ${project} s-osncls-0003.adm.stg1.aub.cloudwatt.net:~/
+	scp ${project} s-osncls-0004.adm.stg1.aub.cloudwatt.net:~/
