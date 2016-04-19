@@ -6,9 +6,8 @@ import (
 	"github.com/codegangsta/cli"
 	"log"
 	"os/exec"
-	"strings"
-	//"io/ioutil"
 	"regexp"
+	"strings"
 )
 
 var diskcodetotype = map[int]string{1: "HDD", 2: "SSD"}
@@ -16,25 +15,32 @@ var diskcodetotype = map[int]string{1: "HDD", 2: "SSD"}
 const maxHDD = 23
 const maxSSD = 2
 
+// Device represents a swift Device on this node
 type Device struct {
 	DeviceName string
-	Vd         *VirtualDisk
+	Vd         VirtualDisk
 	FsLabel    string
 	MountPoint string
 	FstabEntry string
 	partition  bool
 }
 
+// OMAControllerIDs represents the list of controllers ID
+// Deserialized from omreport output
 type OMAControllerIDs struct {
 	Cli           bool  `xml:"cli, attr"`
 	ControllerIDs []int `xml:"Controllers>DCStorageObject>ControllerNum"`
 }
 
+// OMAVirtualDisks represents the list of Virtula Disks
+// Deserialized from omreport output
 type OMAVirtualDisks struct {
 	Cli bool          `xml:"cli, attr"`
 	VDs []VirtualDisk `xml:"VirtualDisks>DCStorageObject"`
 }
 
+// VirtualDisk represents a Virtula Disk
+// Deserialized from omreport output
 type VirtualDisk struct {
 	ControllerNum int    `xml:"ControllerNum"`
 	MediaType     int    `xml:"MediaType"`
@@ -120,6 +126,7 @@ func getAvailableDiskNames(vdisks []VirtualDisk) (chan string, chan string) {
 	return availableHDD, availableSSD
 }
 
+// RenameVdisks renames the vdisks already created following the (HDD|SSD)-x pattern
 func RenameVdisks(ctx *cli.Context) {
 	allvdisks, _ := getAllVdisks()
 	availHDD, availSSD := getAvailableDiskNames(allvdisks.VDs)
@@ -161,12 +168,13 @@ func getAllVdisks() (OMAVirtualDisks, error) {
 	return allvdisks, nil
 }
 
+// Status print the current status of the Nodes Devices. Called from main.
 func Status(ctx *cli.Context) {
 
 	allvdisks, _ := getAllVdisks()
 	allDevices := map[string]Device{}
 	for _, vdisk := range allvdisks.VDs {
-		allDevices[vdisk.DeviceName] = Device{vdisk.DeviceName, &vdisk, "", "", "", false}
+		allDevices[vdisk.DeviceName] = Device{vdisk.DeviceName, vdisk, "", "", "", false}
 	}
 
 	for _, vd := range allvdisks.VDs {
