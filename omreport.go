@@ -10,10 +10,12 @@ import (
 	"strings"
 )
 
-var diskcodetotype = map[int]string{1: "HDD", 2: "SSD"}
+const (
+	cHDD = 1
+	cSSD = 2
+)
 
-const maxHDD = 23
-const maxSSD = 2
+var diskcodetotype = map[int]string{cHDD: "HDD", cSSD: "SSD"}
 
 // Device represents a swift Device on this node
 type Device struct {
@@ -82,10 +84,13 @@ func getmounts() {
 	fmt.Print(string(out))
 }
 
-func renameVdisk(newName string, controllerNum, vdiskID int, dry bool) (string, error) {
-	fmt.Printf("omconfig storage vdisk action=rename controller=%v vdisk=%v name=%v\n", controllerNum, vdiskID, newName)
+func renameVdisk(newName string, vdisk VirtualDisk, dry bool) (string, error) {
+	if newName == vdisk.Name {
+		return newName, nil
+	}
+	fmt.Printf("omconfig storage vdisk action=rename controller=%v vdisk=%v name=%v\n", vdisk.ControllerNum, vdisk.ID, newName)
 	if !dry {
-		out, err := omconfig(fmt.Sprintf("storage vdisk action=rename controller=%v vdisk=%v name=%v", controllerNum, vdiskID, newName))
+		out, err := omconfig(fmt.Sprintf("storage vdisk action=rename controller=%v vdisk=%v name=%v", vdisk.ControllerNum, vdisk.ID, newName))
 		log.Println(string(out))
 		if err != nil {
 			log.Fatal(err.Error())
@@ -104,19 +109,23 @@ func vdiskNameAvailable(name string, vdisks []VirtualDisk) bool {
 	return true
 }
 
-func getAvailableDiskNames(vdisks []VirtualDisk) (chan string, chan string) {
+func getAvailableDiskNames(vdisks []VirtualDisk, maxHDD, maxSSD int, yolo bool) (chan string, chan string) {
 	availableHDD, availableSSD := make(chan string, maxHDD), make(chan string, maxSSD)
+
+	fmt.Printf("Yolo = %v ", yolo)
+	fmt.Printf("maxSSD = %v ", maxSSD)
+	fmt.Printf("maxHDD = %v ", maxHDD)
 
 	for i := 0; i < maxHDD; i++ {
 		name := fmt.Sprintf("HDD-%v", i)
-		if vdiskNameAvailable(name, vdisks) {
+		if yolo || vdiskNameAvailable(name, vdisks) {
 			availableHDD <- name
 		}
 	}
 
 	for i := 0; i < maxSSD; i++ {
 		name := fmt.Sprintf("SSD-%v", i)
-		if vdiskNameAvailable(name, vdisks) {
+		if yolo || vdiskNameAvailable(name, vdisks) {
 			availableSSD <- name
 		}
 	}
@@ -126,35 +135,60 @@ func getAvailableDiskNames(vdisks []VirtualDisk) (chan string, chan string) {
 	return availableHDD, availableSSD
 }
 
+func checkMaxDisks(hdd, ssd int, allvd []VirtualDisk) (int, int) {
+	allHDD, allSSD := 0, 0
+	for _, vd := range allvd {
+		switch vd.MediaType {
+		case cHDD:
+			allHDD++
+		case cSSD:
+			allSSD++
+		default:
+			log.Fatalf("Wrong MediaType %v on %v", vd.MediaType, vd)
+		}
+	}
+	if hdd < 0 {
+		hdd = allHDD
+	}
+	if ssd < 0 {
+		ssd = allSSD
+	}
+	return hdd, ssd
+}
+
 // RenameVdisks renames the vdisks already created following the (HDD|SSD)-x pattern
 func RenameVdisks(ctx *cli.Context) {
+
 	allvdisks, _ := getAllVdisks()
-	availHDD, availSSD := getAvailableDiskNames(allvdisks.VDs)
+
+	maxHDD, maxSSD := checkMaxDisks(ctx.Int("maxhdd"), ctx.Int("maxssd"), allvdisks.VDs)
+	availHDD, availSSD := getAvailableDiskNames(allvdisks.VDs, maxHDD, maxSSD, ctx.Bool("yolo"))
 
 	for _, vdisk := range allvdisks.VDs {
-		match, err := regexp.Match("SSD|HDD|system", []byte(vdisk.Name))
+		match, err := regexp.Match("HDD|SSD|system", []byte(vdisk.Name))
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		if match {
-			continue
-		} else {
+		log.Printf("matched : %v", match)
+		if !match || ctx.Bool("yolo") {
 			switch vdisk.MediaType {
-			case 1:
+			case cHDD:
 				if name, ok := <-availHDD; ok {
-					renameVdisk(name, vdisk.ControllerNum, vdisk.ID, ctx.BoolT("dry"))
+					renameVdisk(name, vdisk, ctx.BoolT("dry"))
 				}
-			case 2:
+			case cSSD:
 				if name, ok := <-availSSD; ok {
-					renameVdisk(name, vdisk.ControllerNum, vdisk.ID, ctx.BoolT("dry"))
+					renameVdisk(name, vdisk, ctx.BoolT("dry"))
 				}
 			default:
-				log.Fatalf("Wrong MediaType")
+				log.Fatalf("Wrong MediaType %v on %v", vdisk.MediaType, vdisk.Name)
 			}
 		}
 	}
 }
 
+// Gets all vdisks from omreport
+// This will filter the system vdisk
 func getAllVdisks() (OMAVirtualDisks, error) {
 	xmlvdisks, err := omreport("storage vdisk -fmt xml")
 	if err != nil {
@@ -165,6 +199,15 @@ func getAllVdisks() (OMAVirtualDisks, error) {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	filtered := make([]VirtualDisk, 0, len(allvdisks.VDs))
+	for _, vd := range allvdisks.VDs {
+		if strings.Contains(vd.Name, "system") || vd.DeviceName == "/dev/sda" {
+			continue
+		}
+		filtered = append(filtered, vd)
+	}
+	allvdisks.VDs = filtered
 	return allvdisks, nil
 }
 

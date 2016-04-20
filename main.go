@@ -13,6 +13,8 @@ func main() {
 		println("Hello friend!")
 	}
 
+	app.EnableBashCompletion = true
+
 	app.Commands = []cli.Command{
 		{
 			Name:    "status",
@@ -28,7 +30,21 @@ func main() {
 			Flags: []cli.Flag{
 				cli.BoolTFlag{
 					Name:  "dry, d",
-					Usage: "Add --dry=false",
+					Usage: "Add --dry=false to actually rename stuff",
+				},
+				cli.BoolFlag{
+					Name:  "yolo",
+					Usage: "DANGER : Add --yolo to force renaming Vdisk with already valid pattern",
+				},
+				cli.IntFlag{
+					Name:  "maxhdd",
+					Usage: "Maximum number of data HDD to use",
+					Value: -1,
+				},
+				cli.IntFlag{
+					Name:  "maxssd",
+					Usage: "Maximum number of data SSD to use",
+					Value: -1,
 				},
 			},
 		},
