@@ -61,7 +61,7 @@ func (vd VirtualDisk) String() string {
 func omreport(args string) ([]byte, error) {
 	out, err := exec.Command("omreport", strings.Split(args, " ")...).Output()
 	if err != nil {
-		return out, errors.Wrap(err, "omreport failed")
+		return out, errors.Wrap(err, "omreport failed : ")
 	}
 	return out, nil
 }
@@ -115,10 +115,6 @@ func vdiskNameAvailable(name string, vdisks []VirtualDisk) bool {
 
 func getAvailableDiskNames(vdisks []VirtualDisk, maxHDD, maxSSD int, yolo bool) (chan string, chan string) {
 	availableHDD, availableSSD := make(chan string, maxHDD), make(chan string, maxSSD)
-
-	fmt.Printf("Yolo = %v ", yolo)
-	fmt.Printf("maxSSD = %v ", maxSSD)
-	fmt.Printf("maxHDD = %v ", maxHDD)
 
 	for i := 0; i < maxHDD; i++ {
 		name := fmt.Sprintf("HDD-%v", i)
@@ -196,12 +192,12 @@ func RenameVdisks(ctx *cli.Context) {
 func getAllVdisks() (OMAVirtualDisks, error) {
 	xmlvdisks, err := omreport("storage vdisk -fmt xml")
 	if err != nil {
-		log.Fatal(err.Error())
+		return OMAVirtualDisks{}, errors.Wrap(err, "Failed to get AllVdisks")
 	}
 
 	allvdisks, err := parseVdisks(xmlvdisks)
 	if err != nil {
-		log.Fatal(err.Error())
+		return OMAVirtualDisks{}, errors.Wrap(err, "Failed to parse Vdisks : ")
 	}
 
 	filtered := make([]VirtualDisk, 0, len(allvdisks.VDs))
@@ -218,7 +214,10 @@ func getAllVdisks() (OMAVirtualDisks, error) {
 // Status print the current status of the Nodes Devices. Called from main.
 func Status(ctx *cli.Context) {
 
-	allvdisks, _ := getAllVdisks()
+	allvdisks, err := getAllVdisks()
+	if err != nil {
+		log.Fatalf("Failed to get status : %+v", err)
+	}
 	allDevices := map[string]Device{}
 	for _, vdisk := range allvdisks.VDs {
 		allDevices[vdisk.DeviceName] = Device{vdisk.DeviceName, vdisk, "", "", "", false}
