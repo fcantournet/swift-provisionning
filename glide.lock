@@ -1,0 +1,9 @@
+hash: daa26824d01013c4ee9bebb3d4198db9817c301133292f7ac99c6d03b898d449
+updated: 2016-06-21T16:43:24.202908854+02:00
+imports:
+- name: github.com/codegangsta/cli
+  version: 6011f165dc288c72abd8acd7722f837c5c64198d
+- name: github.com/pkg/errors
+  version: 01fa4104b9c248c8945d14d9f128454d5b28d595
+  vcs: git
+devImports: []

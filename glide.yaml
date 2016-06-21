@@ -1,0 +1,6 @@
+package: github.com/fcantournet/swift-provisionning
+import:
+- package: github.com/codegangsta/cli
+- package: github.com/pkg/errors
+  vcs: git
+  version: ^0.7.0

@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/codegangsta/cli"
+	"github.com/pkg/errors"
 	"log"
 	"os/exec"
 	"regexp"
@@ -34,14 +35,14 @@ type OMAControllerIDs struct {
 	ControllerIDs []int `xml:"Controllers>DCStorageObject>ControllerNum"`
 }
 
-// OMAVirtualDisks represents the list of Virtula Disks
+// OMAVirtualDisks represents the list of Virtual Disks
 // Deserialized from omreport output
 type OMAVirtualDisks struct {
 	Cli bool          `xml:"cli, attr"`
 	VDs []VirtualDisk `xml:"VirtualDisks>DCStorageObject"`
 }
 
-// VirtualDisk represents a Virtula Disk
+// VirtualDisk represents a Virtual Disk
 // Deserialized from omreport output
 type VirtualDisk struct {
 	ControllerNum int    `xml:"ControllerNum"`
@@ -59,7 +60,10 @@ func (vd VirtualDisk) String() string {
 
 func omreport(args string) ([]byte, error) {
 	out, err := exec.Command("omreport", strings.Split(args, " ")...).Output()
-	return out, err
+	if err != nil {
+		return out, errors.Wrap(err, "omreport failed")
+	}
+	return out, nil
 }
 
 func omconfig(args string) ([]byte, error) {
