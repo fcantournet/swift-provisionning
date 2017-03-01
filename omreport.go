@@ -18,6 +18,14 @@ const (
 
 var diskcodetotype = map[int]string{cHDD: "HDD", cSSD: "SSD"}
 
+// DataDisk represents a Physical Disk on the Node available for
+// usgae as a Swift data disk. (not system)
+type DataDisk struct {
+	Pd    PhysicalDisk
+	HasVd bool
+	Vd    VirtualDisk
+}
+
 // Device represents a swift Device on this node
 type Device struct {
 	DeviceName string
@@ -33,6 +41,24 @@ type Device struct {
 type OMAControllerIDs struct {
 	Cli           bool  `xml:"cli, attr"`
 	ControllerIDs []int `xml:"Controllers>DCStorageObject>ControllerNum"`
+}
+
+// OMAPhysicalDisks represents the list of Physical Disks
+// Deserialized from omreport output
+type OMAPhysicalDisks struct {
+	Cli bool           `xml:"cli, attr"`
+	PDs []PhysicalDisk `xml:"ArrayDisks>DCStorageObject"`
+}
+
+// PhysicalDisk represents a Physical Disk
+// Deserialized from omreport output
+type PhysicalDisk struct {
+	EnclosureID   int `xml:"EnclosureID"`
+	Channel       int `xml:"Channel"`
+	ControllerNum int `xml:"ControllerNum"`
+	MediaType     int `xml:"MediaType"`
+	TargetID      int `xml:"TargetID"`
+	ID            int `xml:"DeviceID"`
 }
 
 // OMAVirtualDisks represents the list of Virtual Disks
@@ -53,7 +79,11 @@ type VirtualDisk struct {
 }
 
 func (vd VirtualDisk) String() string {
-	return fmt.Sprintf("%s  type=%s  device: %s", vd.Name, diskcodetotype[vd.MediaType], vd.DeviceName)
+	return fmt.Sprintf("%s  type=%s  device=%s ID=%v", vd.Name, diskcodetotype[vd.MediaType], vd.DeviceName, vd.ID)
+}
+
+func (pd PhysicalDisk) String() string {
+	return fmt.Sprintf("PD: ID=%v controller=%v type=%s TargetID=%v", pd.ID, pd.ControllerNum, diskcodetotype[pd.MediaType], pd.TargetID)
 }
 
 //type VDisksByController map[int][]VirtualDisk
@@ -79,6 +109,12 @@ func parseControllerIDs(xmldata []byte) (OMAControllerIDs, error) {
 
 func parseVdisks(xmldata []byte) (OMAVirtualDisks, error) {
 	var oma OMAVirtualDisks
+	err := xml.Unmarshal(xmldata, &oma)
+	return oma, err
+}
+
+func parsePdisks(xmldata []byte) (OMAPhysicalDisks, error) {
+	var oma OMAPhysicalDisks
 	err := xml.Unmarshal(xmldata, &oma)
 	return oma, err
 }
@@ -192,7 +228,7 @@ func RenameVdisks(ctx *cli.Context) {
 func getAllVdisks() (OMAVirtualDisks, error) {
 	xmlvdisks, err := omreport("storage vdisk -fmt xml")
 	if err != nil {
-		return OMAVirtualDisks{}, errors.Wrap(err, "Failed to get AllVdisks")
+		return OMAVirtualDisks{}, errors.Wrap(err, "Failed to get AllVdisks : ")
 	}
 
 	allvdisks, err := parseVdisks(xmlvdisks)
@@ -209,6 +245,34 @@ func getAllVdisks() (OMAVirtualDisks, error) {
 	}
 	allvdisks.VDs = filtered
 	return allvdisks, nil
+}
+
+func getControllers() (OMAControllerIDs, error) {
+	xmlcontroller, err := omreport("storage controller -fmt xml")
+	if err != nil {
+		return OMAControllerIDs{}, errors.Wrap(err, "Failed to get Controllers : ")
+	}
+	controllers, err := parseControllerIDs(xmlcontroller)
+	if err != nil {
+		return OMAControllerIDs{}, errors.Wrap(err, "Failed to parse xml : ")
+	}
+	return controllers, nil
+}
+
+func getPdisksForController(int) {}
+
+func getAllPdisks() (OMAPhysicalDisks, error) {
+	controllers, err := getControllers()
+	if err != nil {
+		return OMAPhysicalDisks{}, errors.Wrap(err, "Failed to get Controllers : ")
+	}
+
+	for _, controller := range controllers.ControllerIDs {
+
+	}
+
+	return OMAPhysicalDisks{}, nil
+
 }
 
 // Status print the current status of the Nodes Devices. Called from main.
