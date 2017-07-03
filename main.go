@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/codegangsta/cli"
 	"os"
+
+	"github.com/codegangsta/cli"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 			Action:  Status,
 		},
 		{
-			Name:    "rename",
+			Name:    "rename-vdisk",
 			Aliases: []string{"r"},
 			Usage:   "Rename Vdisks conforming to cloudwatt spec",
 			Action:  RenameVdisks,
@@ -45,6 +46,17 @@ func main() {
 					Name:  "maxssd",
 					Usage: "Maximum number of data SSD to use",
 					Value: -1,
+				},
+			},
+		},
+		{
+			Name:   "add-labels",
+			Usage:  "Add xfs labels to fs matching Vdisk Name",
+			Action: AddLabels,
+			Flags: []cli.Flag{
+				cli.BoolTFlag{
+					Name:  "dry, d",
+					Usage: "Add --dry=false to actually rename stuff",
 				},
 			},
 		},

@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/xml"
 	"fmt"
-	"github.com/codegangsta/cli"
-	"github.com/pkg/errors"
 	"log"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/codegangsta/cli"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -193,7 +194,7 @@ func checkMaxDisks(hdd, ssd int, allvd []VirtualDisk) (int, int) {
 }
 
 // RenameVdisks renames the vdisks already created following the (HDD|SSD)-x pattern
-func RenameVdisks(ctx *cli.Context) {
+func RenameVdisks(ctx *cli.Context) error {
 
 	allvdisks, _ := getAllVdisks()
 
@@ -203,9 +204,11 @@ func RenameVdisks(ctx *cli.Context) {
 	for _, vdisk := range allvdisks.VDs {
 		match, err := regexp.Match("HDD|SSD|system", []byte(vdisk.Name))
 		if err != nil {
-			log.Fatal(err.Error())
+			return err
 		}
-		log.Printf("matched : %v", match)
+		if match {
+			log.Printf("skipping %v because it already adheres to standard (Name: %v)", vdisk.DeviceName, vdisk.Name)
+		}
 		if !match || ctx.Bool("yolo") {
 			switch vdisk.MediaType {
 			case cHDD:
@@ -217,10 +220,11 @@ func RenameVdisks(ctx *cli.Context) {
 					renameVdisk(name, vdisk, ctx.BoolT("dry"))
 				}
 			default:
-				log.Fatalf("Wrong MediaType %v on %v", vdisk.MediaType, vdisk.Name)
+				return fmt.Errorf("Wrong MediaType %v on %v", vdisk.MediaType, vdisk.Name)
 			}
 		}
 	}
+	return nil
 }
 
 // Gets all vdisks from omreport
@@ -259,28 +263,12 @@ func getControllers() (OMAControllerIDs, error) {
 	return controllers, nil
 }
 
-func getPdisksForController(int) {}
-
-func getAllPdisks() (OMAPhysicalDisks, error) {
-	controllers, err := getControllers()
-	if err != nil {
-		return OMAPhysicalDisks{}, errors.Wrap(err, "Failed to get Controllers : ")
-	}
-
-	for _, controller := range controllers.ControllerIDs {
-
-	}
-
-	return OMAPhysicalDisks{}, nil
-
-}
-
 // Status print the current status of the Nodes Devices. Called from main.
-func Status(ctx *cli.Context) {
+func Status(ctx *cli.Context) error {
 
 	allvdisks, err := getAllVdisks()
 	if err != nil {
-		log.Fatalf("Failed to get status : %+v", err)
+		return errors.Wrap(err, "cannot get vdisks")
 	}
 	allDevices := map[string]Device{}
 	for _, vdisk := range allvdisks.VDs {
@@ -290,4 +278,23 @@ func Status(ctx *cli.Context) {
 	for _, vd := range allvdisks.VDs {
 		fmt.Println(vd)
 	}
+	return nil
+}
+
+func AddLabels(ctx *cli.Context) error {
+	allvdisks, err := getAllVdisks()
+	if err != nil {
+		return errors.Wrap(err, "cannot get vdisks")
+	}
+
+	for _, vdisk := range allvdisks.VDs {
+		fmt.Println(fmt.Sprintf("xfs_admin -L %v %v", vdisk.Name, vdisk.DeviceName))
+		if !ctx.Bool("dry") {
+			err := exec.Command("xfs_admin", "-L", vdisk.Name, vdisk.DeviceName).Run()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
